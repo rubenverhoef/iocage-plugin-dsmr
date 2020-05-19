@@ -1,49 +1,66 @@
 #!/bin/sh
 
-sysrc 'postgresql_enable=YES' 'nginx_enable=YES' 'supervisord_enable=YES'
-sudo sudo -u postgres initdb -D /var/db/postgres/data12
+# 1. Database backend (PostgreSQL)
+# Enable and start Postgresql
+sysrc 'postgresql_enable=YES'
+# Initialize Postgresql
+/usr/local/etc/rc.d/postgresql initdb
+# Start Postgresql
 service postgresql start
-
-# Database
+# Create database user:
 sudo sudo -u postgres createuser -DSR dsmrreader
+# Create database, owned by the database user we just created:
 sudo sudo -u postgres createdb -O dsmrreader dsmrreader
+# Set password for database user:
 sudo sudo -u postgres psql -c "alter user dsmrreader with password 'dsmrreader';"
 
-# Code checkout
-mkdir -p /usr/local/www/dsmrreader/static
-git clone https://github.com/dennissiemensma/dsmr-reader.git /root/dsmr-reader
+# 2. Dependencies
+# Already installed by plugin
 
-# Config & requirements
-cp /root/dsmr-reader/dsmrreader/provisioning/django/postgresql.py /root/dsmr-reader/dsmrreader/settings.py
-pip install -r /root/dsmr-reader/dsmrreader/provisioning/requirements/base.txt -r /root/dsmr-reader/dsmrreader/provisioning/requirements/postgresql.txt
+# 3. Application user
+pw group add dsmr
+pw user add -n dsmr -d /home/dsmr -G dsmr -m -s /usr/local/bin/bash
 
-# Setup
-python3.7 /root/dsmr-reader/manage.py migrate
-python3.7 /root/dsmr-reader/manage.py collectstatic --noinput
-mv /var/www/dsmrreader/* /usr/local/www/dsmrreader
+# 4. Webserver/Nginx (part 1)
+sudo mkdir -p /var/www/dsmrreader/static
+sudo chown -R dsmr:dsmr /var/www/dsmrreader/
 
-# Nginx
+# 5. Clone project code from Github
+sudo git clone https://github.com/dennissiemensma/dsmr-reader.git /home/dsmr/dsmr-reader
+sudo chown -R dsmr:dsmr /home/dsmr/
+
+# 6. Virtualenv
+sudo sudo -u dsmr mkdir /home/dsmr/.virtualenvs
+sudo sudo -u dsmr virtualenv /home/dsmr/.virtualenvs/dsmrreader --no-site-packages --python python3.7
+
+# 7. Application configuration & setup
+sudo sudo -u dsmr cp /home/dsmr/dsmr-reader/dsmrreader/provisioning/django/postgresql.py /home/dsmr/dsmr-reader/dsmrreader/settings.py
+sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/pip3 install -r /home/dsmr/dsmr-reader/dsmrreader/provisioning/requirements/base.txt -r /home/dsmr/dsmr-reader/dsmrreader/provisioning/requirements/postgresql.txt
+
+# 8. Bootstrapping
+# Not nessasary, Skipping
+
+# 9. Webserver/Nginx (part 2)
+sysrc 'nginx_enable=YES'
 service nginx start
+# Copy application vhost, it will listen to any hostname (wildcard), but you may change that if you feel like you need to. It won’t affect the application anyway:
+cp /root/dsmr-reader/dsmrreader/provisioning/nginx/dsmr-webinterface /usr/local/etc/nginx/nginx.conf
+service nginx restart
 
-
-# Supervisor
+# 10. Supervisor
+sysrc 'supervisord_enable=YES'
 
 mkdir -p /var/log/supervisor
 mkdir -p /usr/local/etc/supervisor/conf.d
-cp /root/dsmr-reader/dsmrreader/provisioning/supervisor/dsmr-reader.conf /usr/local/etc/supervisor/conf.d/
 
 #sed all dsmr-reader.conf settings
-
-# ;[include] -> [include]
-# ;files = * -> files = /usr/local/etc/supervisor/conf.d/*.conf
-# sed -i 's/^# DAB Setup.*//' /boot/config.txt
-# sudo sudo -u postgres echo "hoi" >> "/usr/local/etc/supervisord.conf"
+sed -i '' 's/;\[include\]/\[include\]/g' /usr/local/etc/supervisord.conf
+sed -i '' 's/;files =.*/files = \/usr\/local\/etc\/supervisor\/conf.d\/*.conf/g' /usr/local/etc/supervisord.conf
+# Copy the configuration files for Supervisor:
+sudo cp /home/dsmr/dsmr-reader/dsmrreader/provisioning/supervisor/dsmr_datalogger.conf /usr/local/etc/supervisor/conf.d/
+sudo cp /home/dsmr/dsmr-reader/dsmrreader/provisioning/supervisor/dsmr_backend.conf /usr/local/etc/supervisor/conf.d/
+sudo cp /home/dsmr/dsmr-reader/dsmrreader/provisioning/supervisor/dsmr_webinterface.conf /usr/local/etc/supervisor/conf.d/
 
 service supervisord start
-supervisorctl reread
-supervisorctl update
-
-
-python3.7 /root/dsmr-reader/manage.py createsuperuser --username admin --email root@localhost
-
-http://192.168.0.16/
+sudo supervisorctl reread
+sudo supervisorctl update
