@@ -49,8 +49,10 @@ sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/python3 /home/dsmr/dsmr
 sysrc 'nginx_enable=YES'
 service nginx start
 
+cp /home/dsmr/dsmr-reader/dsmrreader/provisioning/nginx/dsmr-webinterface /usr/local/etc/nginx/dsmr-webinterface
+
 sed -i '' '/^    server {/i\
-    include \/home\/dsmr\/dsmr-reader\/dsmrreader\/provisioning\/nginx\/dsmr-webinterface;\
+    include dsmr-webinterface;\
 \
 ' /usr/local/etc/nginx/nginx.conf
 
