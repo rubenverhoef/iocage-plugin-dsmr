@@ -43,8 +43,11 @@ sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/pip3 install -r /home/d
 # 9. Webserver/Nginx (part 2)
 sysrc 'nginx_enable=YES'
 service nginx start
-# Copy application vhost, it will listen to any hostname (wildcard), but you may change that if you feel like you need to. It won’t affect the application anyway:
-cp /root/dsmr-reader/dsmrreader/provisioning/nginx/dsmr-webinterface /usr/local/etc/nginx/nginx.conf
+
+sed -i '' '/^    server {/i\\
+    include \/home\/dsmr\/dsmr-reader\/dsmrreader\/provisioning\/nginx\/dsmr-webinterface;\
+' /usr/local/etc/nginx/nginx.conf
+
 service nginx restart
 
 # 10. Supervisor
