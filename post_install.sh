@@ -44,8 +44,9 @@ sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/pip3 install -r /home/d
 sysrc 'nginx_enable=YES'
 service nginx start
 
-sed -i '' '/^    server {/i\\
+sed -i '' '/^    server {/i\
     include \/home\/dsmr\/dsmr-reader\/dsmrreader\/provisioning\/nginx\/dsmr-webinterface;\
+\
 ' /usr/local/etc/nginx/nginx.conf
 
 service nginx restart
