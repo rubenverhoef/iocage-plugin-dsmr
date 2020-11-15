@@ -1,51 +1,49 @@
 #!/bin/sh
 
-# 1. Database backend (PostgreSQL)
 # Enable and start Postgresql
 sysrc 'postgresql_enable=YES'
-# Initialize Postgresql
 /usr/local/etc/rc.d/postgresql initdb
-# Start Postgresql
 service postgresql start
-# Create database user:
+
+# Database
 sudo sudo -u postgres createuser -DSR dsmrreader
-# Create database, owned by the database user we just created:
 sudo sudo -u postgres createdb -O dsmrreader dsmrreader
-# Set password for database user:
 sudo sudo -u postgres psql -c "alter user dsmrreader with password 'dsmrreader';"
 
-# 2. Dependencies
-# Already installed by plugin
-
-# 3. Application user
+# System user
 pw group add dsmr
 pw user add -n dsmr -d /home/dsmr -G dsmr -m -s /usr/local/bin/bash
 
-# 4. Webserver/Nginx (part 1)
+# Nginx
 sudo mkdir -p /var/www/dsmrreader/static
 sudo chown -R dsmr:dsmr /var/www/dsmrreader/
 
-# 5. Clone project code from Github
-sudo git clone https://github.com/dennissiemensma/dsmr-reader.git /home/dsmr/dsmr-reader
+# Code checkout
+sudo git clone https://github.com/dsmrreader/dsmr-reader.git /home/dsmr/dsmr-reader
 sudo chown -R dsmr:dsmr /home/dsmr/
 
-# 6. Virtualenv
+# Virtual env
 sudo sudo -u dsmr mkdir /home/dsmr/.virtualenvs
 sudo sudo -u dsmr virtualenv /home/dsmr/.virtualenvs/dsmrreader --no-site-packages --python python3.7
 
-# 7. Application configuration & setup
-sudo sudo -u dsmr cp /home/dsmr/dsmr-reader/dsmrreader/provisioning/django/postgresql.py /home/dsmr/dsmr-reader/dsmrreader/settings.py
-sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/pip3 install -r /home/dsmr/dsmr-reader/dsmrreader/provisioning/requirements/base.txt -r /home/dsmr/dsmr-reader/dsmrreader/provisioning/requirements/postgresql.txt
+# Config
+sudo sudo -u dsmr cp /home/dsmr/dsmr-reader/dsmrreader/provisioning/django/settings.py.template /home/dsmr/dsmr-reader/dsmrreader/settings.py
+sudo sudo -u dsmr cp /home/dsmr/dsmr-reader/.env.template /home/dsmr/dsmr-reader/.env
+sudo sudo -u dsmr /home/dsmr/dsmr-reader/tools/generate-secret-key.sh
 
-# 8. Bootstrapping
-# Execute this to initialize the database we’ve created earlier:
+# Requirements
+sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/pip3 install -r /home/dsmr/dsmr-reader/dsmrreader/provisioning/requirements/base.txt
+sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/pip3 install psycopg2
+
+# Setup
 sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/python3 /home/dsmr/dsmr-reader/manage.py migrate
-# Sync static files:
 sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/python3 /home/dsmr/dsmr-reader/manage.py collectstatic --noinput
-# Create your user:
-sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/python3 /home/dsmr/dsmr-reader/manage.py createsuperuser --username admin --email root@localhost --noinput
 
-# 9. Webserver/Nginx (part 2)
+# Create (super)user with the values in DSMR_USER and
+# DSMR_PASSWORD as defined in one of the previous steps.
+sudo sudo -u dsmr /home/dsmr/.virtualenvs/dsmrreader/bin/python3 /home/dsmr/dsmr-reader/manage.py dsmr_superuser
+
+# Nginx
 sysrc 'nginx_enable=YES'
 service nginx start
 
@@ -58,7 +56,7 @@ sed -i '' '/^    server {/i\
 
 service nginx restart
 
-# 10. Supervisor
+# Supervisor
 sysrc 'supervisord_enable=YES'
 
 mkdir -p /var/log/supervisor
